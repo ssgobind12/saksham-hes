@@ -158,11 +158,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 300,
-    versionName: '1.3.0',
+    versionCode: 301,
+    versionName: '1.3.1',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Removed manual administrative / role selection\n• In-app direct progress updater\n• Real DLMS Genus BLE Meter Data Decoding\n• Live Energy & Tariff Registers Dynamic Binding\n• Added gateway feature',
+    releaseNotes: '• Removed OTP display from client app (Admin Authorization required)\n• Integrated 2.03M Authorized SAKSHAM Meter Registry\n• Strict BLE Device Filtering (non-meters & unauthorized devices hidden)\n• DLMS Real-Time Gateway & Command Tunneling',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
@@ -390,10 +390,9 @@ app.post('/api/relay/otp/request', (req, res) => {
 
   res.json({
     success: true,
-    message: `OTP has been dispatched to registered mobile number (${user.mobileNumber})`,
+    message: `OTP has been dispatched to registered mobile number (${user.mobileNumber}). Please contact Administrator for authorization code.`,
     requestId,
-    mobileNumberMasked: maskMobile(user.mobileNumber),
-    demoOtp: otp
+    mobileNumberMasked: maskMobile(user.mobileNumber)
   });
 });
 
