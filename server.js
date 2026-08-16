@@ -157,7 +157,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 200,
+    versionCode: 201,
     versionName: '1.2.1',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
