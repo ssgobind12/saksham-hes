@@ -52,43 +52,46 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Default baseline users (guaranteed to always exist across server restarts and deploys)
+const DEFAULT_USERS = [
+  {
+    id: '1',
+    username: 'admin',
+    passwordHash: hashPassword(process.env.ADMIN_PASSWORD || 'ssgobind12'),
+    plainPassword: process.env.ADMIN_PASSWORD || 'ssgobind12',
+    fullName: 'System Administrator (Shubham)',
+    mobileNumber: '+91 8573029430',
+    role: 'ADMIN',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: '2',
+    username: 'Kush01',
+    passwordHash: hashPassword('Shubham@001'),
+    plainPassword: 'Shubham@001',
+    fullName: 'Shubham',
+    mobileNumber: '+916386522362',
+    role: 'SUPERVISOR',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: '3',
+    username: 'Shubh01',
+    passwordHash: hashPassword('Shubh@123'),
+    plainPassword: 'Shubh@123',
+    fullName: 'Shubham Pratap Singh',
+    mobileNumber: '+91 8573029430',
+    role: 'SUPERVISOR',
+    createdAt: new Date().toISOString()
+  }
+];
+
 // Database helper
 function loadData() {
   let data = null;
   if (!fs.existsSync(DATA_FILE)) {
     data = {
-      users: [
-        {
-          id: '1',
-          username: ADMIN_USERNAME,
-          passwordHash: hashPassword(ADMIN_PASSWORD),
-          plainPassword: ADMIN_PASSWORD,
-          fullName: 'System Administrator',
-          mobileNumber: '+91 9800000000',
-          role: 'ADMIN',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: '2',
-          username: 'tech01',
-          passwordHash: hashPassword('tech123'),
-          plainPassword: 'tech123',
-          fullName: 'Shubh Technician',
-          mobileNumber: '+91 9876543210',
-          role: 'TECHNICIAN',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: '3',
-          username: 'super01',
-          passwordHash: hashPassword('super123'),
-          plainPassword: 'super123',
-          fullName: 'Field Supervisor',
-          mobileNumber: '+91 9123456780',
-          role: 'SUPERVISOR',
-          createdAt: new Date().toISOString()
-        }
-      ],
+      users: [...DEFAULT_USERS],
       relayRequests: [],
       relayLogs: [],
       meterReadings: []
@@ -98,31 +101,20 @@ function loadData() {
   }
   try {
     data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!data.users || !Array.isArray(data.users)) {
+      data.users = [...DEFAULT_USERS];
+    }
   } catch (e) {
-    data = { users: [], relayRequests: [], relayLogs: [], meterReadings: [] };
+    data = { users: [...DEFAULT_USERS], relayRequests: [], relayLogs: [], meterReadings: [] };
   }
 
-  // Ensure admin user matches current .env config if specified
-  const adminIndex = data.users.findIndex(u => u.username.toLowerCase() === ADMIN_USERNAME.toLowerCase());
-  if (adminIndex === -1) {
-    data.users.unshift({
-      id: '1',
-      username: ADMIN_USERNAME,
-      passwordHash: hashPassword(ADMIN_PASSWORD),
-      plainPassword: ADMIN_PASSWORD,
-      fullName: 'System Administrator',
-      mobileNumber: '+91 9800000000',
-      role: 'ADMIN',
-      createdAt: new Date().toISOString()
-    });
-    saveData(data);
-  } else {
-    if (process.env.ADMIN_PASSWORD && data.users[adminIndex].passwordHash !== hashPassword(ADMIN_PASSWORD)) {
-      data.users[adminIndex].passwordHash = hashPassword(ADMIN_PASSWORD);
-      data.users[adminIndex].plainPassword = ADMIN_PASSWORD;
-      saveData(data);
+  // Ensure default baseline users always exist without wiping custom created users
+  DEFAULT_USERS.forEach(defUser => {
+    const existingIndex = data.users.findIndex(u => u.username.toLowerCase() === defUser.username.toLowerCase());
+    if (existingIndex === -1) {
+      data.users.push(defUser);
     }
-  }
+  });
 
   return data;
 }

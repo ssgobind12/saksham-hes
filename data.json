@@ -1,0 +1,37 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "username": "admin",
+      "passwordHash": "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+      "plainPassword": "admin",
+      "fullName": "System Administrator (Shubham)",
+      "mobileNumber": "+91 8573029430",
+      "role": "ADMIN",
+      "createdAt": "2026-08-16T17:00:00.000Z"
+    },
+    {
+      "id": "2",
+      "username": "Kush01",
+      "passwordHash": "4430e791b89fc0c265ff3a97126139cfa3624e5488424075b22b109e25d2ea99",
+      "plainPassword": "Shubham@001",
+      "fullName": "Shubham",
+      "mobileNumber": "+916386522362",
+      "role": "SUPERVISOR",
+      "createdAt": "2026-08-16T17:00:00.000Z"
+    },
+    {
+      "id": "3",
+      "username": "Shubh01",
+      "passwordHash": "1a704f1418b76c8c4c379a527c7cf585d8eb82937dd49666014e7ea18b26e2e5",
+      "plainPassword": "Shubh@123",
+      "fullName": "Shubham Pratap Singh",
+      "mobileNumber": "+91 8573029430",
+      "role": "SUPERVISOR",
+      "createdAt": "2026-08-16T17:00:00.000Z"
+    }
+  ],
+  "relayRequests": [],
+  "relayLogs": [],
+  "meterReadings": []
+}
