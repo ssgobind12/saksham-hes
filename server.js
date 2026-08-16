@@ -157,11 +157,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 102,
-    versionName: '1.2.0',
+    versionCode: 200,
+    versionName: '1.2.1',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Real DLMS Genus BLE Meter Data Decoding\n• Profile Screen with In-App Auto-Updater\n• Strict Role-Based User Security',
+    releaseNotes: '• Real DLMS Genus BLE Meter Data Decoding\n• Live Energy & Tariff Registers Dynamic Binding\n• Profile Screen with Instant In-App Auto-Updater\n• Strict Role-Based User Security',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
@@ -173,12 +173,11 @@ app.get('/api/app/download', (req, res) => {
   const localApkPath = path.join(__dirname, 'SAKSHAM-145-MeterClient.apk');
   const rootApkPath = path.join(__dirname, '..', 'SAKSHAM-145-MeterClient.apk');
   
-  if (fs.existsSync(apkPath)) {
-    return res.download(apkPath, 'SAKSHAM-145-MeterClient.apk');
-  } else if (fs.existsSync(localApkPath)) {
-    return res.download(localApkPath, 'SAKSHAM-145-MeterClient.apk');
-  } else if (fs.existsSync(rootApkPath)) {
-    return res.download(rootApkPath, 'SAKSHAM-145-MeterClient.apk');
+  const target = fs.existsSync(apkPath) ? apkPath : (fs.existsSync(localApkPath) ? localApkPath : (fs.existsSync(rootApkPath) ? rootApkPath : null));
+  if (target) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="SAKSHAM-145-MeterClient.apk"');
+    return res.sendFile(target);
   } else {
     return res.redirect('https://github.com/ssgobind12/saksham-hes');
   }
