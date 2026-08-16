@@ -1,0 +1,23 @@
+{
+  "name": "saksham145-hes-server",
+  "version": "1.0.0",
+  "description": "ssgobind.space HES Portal & REST API for Genus SAKSHAM-145 Smart Meter Client",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "keywords": ["dlms", "smart-meter", "hes", "saksham145"],
+  "author": "Genus SAKSHAM-145 Client",
+  "license": "ISC"
+}

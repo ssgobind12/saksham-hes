@@ -1,0 +1,24 @@
+ssgobind.space, www.ssgobind.space {
+    # Reverse proxy all requests to the Node.js backend on port 3000
+    reverse_proxy 127.0.0.1:3000
+
+    # Enable modern gzip/zstd compression
+    encode zstd gzip
+
+    # Security Headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Access and error logs
+    log {
+        output file /var/log/caddy/ssgobind.access.log {
+            roll_size 10MB
+            roll_keep 10
+        }
+    }
+}

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAKSHAM-145 HES Cloud Portal | ssgobind.space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-logo">⚡</div>
+      <div>
+        <h1 class="brand-title">SAKSHAM-145 HES</h1>
+        <p class="brand-subtitle">Smart Meter Management Portal • ssgobind.space</p>
+      </div>
+    </div>
+    <div class="header-user-info" id="headerUserInfo" style="display: none;">
+      <span class="user-badge" id="userRoleBadge">ADMIN</span>
+      <span class="username-display" id="usernameDisplay">admin</span>
+      <button class="btn btn-outline-danger btn-sm" id="logoutBtn" onclick="handleLogout()">Logout</button>
+    </div>
+  </header>
+
+  <!-- Login Modal / Card -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-icon">🔐</div>
+        <h2>Portal Sign In</h2>
+        <p>Enter administrative or supervisor credentials</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="loginUsername">Username / User ID</label>
+          <input type="text" id="loginUsername" class="form-control" placeholder="e.g. admin or super01" required value="admin">
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required value="admin123">
+        </div>
+        <div id="loginAlert" class="alert alert-danger" style="display: none;"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="loginSubmitBtn">Sign In</button>
+      </form>
+      <div class="login-footer">
+        <small>Demo Accounts: <code>admin / admin123</code> | <code>super01 / super123</code></small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Dashboard Container -->
+  <main class="dashboard-container" id="mainDashboard" style="display: none;">
+    <!-- Navigation Tabs -->
+    <nav class="dashboard-nav">
+      <button class="nav-tab active" onclick="switchTab('usersTab')">👥 User Management</button>
+      <button class="nav-tab" onclick="switchTab('otpTab')">🔑 Relay Approvals & OTP</button>
+      <button class="nav-tab" onclick="switchTab('readingsTab')">📊 Meter Readings</button>
+      <button class="nav-tab" onclick="switchTab('relayLogsTab')">📜 Relay Audit Logs</button>
+    </nav>
+
+    <!-- TAB 1: User Management -->
+    <section class="tab-content active" id="usersTab">
+      <div class="section-header">
+        <div>
+          <h2>User Accounts & Role Permissions</h2>
+          <p>Create technician & supervisor credentials with mobile numbers for OTP delivery</p>
+        </div>
+        <button class="btn btn-primary" onclick="openCreateUserModal()">+ Create New User</button>
+      </div>
+
+      <div class="table-container card">
+        <table class="data-table" id="usersTable">
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Full Name</th>
+              <th>Role</th>
+              <th>Registered Mobile (for OTP)</th>
+              <th>Created Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody">
+            <tr><td colspan="6" class="text-center">Loading users...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 2: Relay Approvals & OTP Center -->
+    <section class="tab-content" id="otpTab">
+      <div class="section-header">
+        <div>
+          <h2>Relay Operation Approvals & OTP Dispatch</h2>
+          <p>Real-time stream of field technician relay requests and 6-digit mobile OTPs</p>
+        </div>
+        <button class="btn btn-outline" onclick="loadRelayRequests()">🔄 Refresh</button>
+      </div>
+
+      <div class="table-container card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Request ID</th>
+              <th>Meter ID</th>
+              <th>Action</th>
+              <th>Requested By</th>
+              <th>Registered Phone</th>
+              <th>Generated OTP</th>
+              <th>Status</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="otpTableBody">
+            <tr><td colspan="8" class="text-center">No pending relay requests</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 3: Meter Readings -->
+    <section class="tab-content" id="readingsTab">
+      <div class="section-header">
+        <div>
+          <h2>Field Meter Readings</h2>
+          <p>Live synchronized parameters (Voltage, Current, Power Factor, Import/Export kWh)</p>
+        </div>
+        <button class="btn btn-outline" onclick="loadReadings()">🔄 Refresh</button>
+      </div>
+
+      <div class="table-container card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Meter Serial</th>
+              <th>Voltage (V)</th>
+              <th>Current (A)</th>
+              <th>Active Power (kW)</th>
+              <th>PF</th>
+              <th>Import kWh</th>
+              <th>Received At</th>
+            </tr>
+          </thead>
+          <tbody id="readingsTableBody">
+            <tr><td colspan="7" class="text-center">No readings recorded yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 4: Relay Audit Logs -->
+    <section class="tab-content" id="relayLogsTab">
+      <div class="section-header">
+        <div>
+          <h2>Relay Disconnect/Connect Audit Trail</h2>
+          <p>Tamper-evident logs of all field relay state transitions</p>
+        </div>
+        <button class="btn btn-outline" onclick="loadRelayLogs()">🔄 Refresh</button>
+      </div>
+
+      <div class="table-container card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Meter Serial</th>
+              <th>Command</th>
+              <th>State Transition</th>
+              <th>Authorized By</th>
+              <th>OTP Verified</th>
+              <th>Result</th>
+              <th>Logged At</th>
+            </tr>
+          </thead>
+          <tbody id="relayLogsTableBody">
+            <tr><td colspan="7" class="text-center">No relay audit logs available</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Create User Modal -->
+  <div class="modal-overlay" id="createUserModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Create New User & Assign Role</h3>
+        <button class="modal-close" onclick="closeCreateUserModal()">&times;</button>
+      </div>
+      <form id="createUserForm" onsubmit="handleCreateUser(event)">
+        <div class="form-group">
+          <label for="newUsername">User ID / Username *</label>
+          <input type="text" id="newUsername" class="form-control" placeholder="e.g. tech_shubh" required>
+        </div>
+        <div class="form-group">
+          <label for="newFullName">Full Name *</label>
+          <input type="text" id="newFullName" class="form-control" placeholder="e.g. Shubh Sharma" required>
+        </div>
+        <div class="form-group">
+          <label for="newPassword">Initial Password *</label>
+          <input type="password" id="newPassword" class="form-control" placeholder="Minimum 6 characters" required>
+        </div>
+        <div class="form-group">
+          <label for="newMobile">Registered Mobile Number (for OTP) *</label>
+          <input type="tel" id="newMobile" class="form-control" placeholder="e.g. +91 9876543210" required>
+          <small class="form-hint">6-digit authorization OTPs for relay operations will be sent to this number.</small>
+        </div>
+        <div class="form-group">
+          <label for="newRole">User Role *</label>
+          <select id="newRole" class="form-control" required>
+            <option value="TECHNICIAN" selected>TECHNICIAN (Meter Reading, Diagnostics & Relay Operations)</option>
+            <option value="SUPERVISOR">SUPERVISOR (Relay Authorization, OTP Approval & Full Access)</option>
+            <option value="ADMIN">ADMIN (System Configuration, User Management)</option>
+            <option value="VIEWER">VIEWER (Read-Only Meter Readings)</option>
+          </select>
+        </div>
+        <div id="createUserAlert" class="alert alert-danger" style="display: none;"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeCreateUserModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="createUserSubmitBtn">Save User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
