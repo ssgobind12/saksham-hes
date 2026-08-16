@@ -3,29 +3,38 @@
     {
       "id": "1",
       "username": "admin",
-      "passwordHash": "$2a$10$oMirMyCsI/PCLU7OnKBuLuvG2K1ti.AC6yF0TWoaTo2j4tSxhsBte",
+      "passwordHash": "$2a$10$SZL7ntohA.c9gxI3T7ZzQev.fwRXFtfL.asOZ.lWnU8S./xOLpwJS",
       "fullName": "System Administrator (Shubham)",
       "mobileNumber": "+91 8573029430",
       "role": "ADMIN",
-      "createdAt": "2026-08-16T18:38:01.824Z"
+      "createdAt": "2026-08-16T18:53:23.793Z"
     },
     {
       "id": "2",
-      "username": "Kush01",
-      "passwordHash": "$2a$10$rPqFhQzuKt20gcf4rDJFN.hzmC2KEkLPTl54CGrEaVet0HXHpOcuy",
-      "fullName": "Shubham",
-      "mobileNumber": "+916386522362",
+      "username": "super01",
+      "passwordHash": "$2a$10$BxAo1wqTa5ZJVJzhQ4TgW.Eb5LkHhlCNgJ44UWTo/L3O7la81KtKq",
+      "fullName": "Field Supervisor",
+      "mobileNumber": "+91 8573029430",
       "role": "SUPERVISOR",
-      "createdAt": "2026-08-16T18:38:01.907Z"
+      "createdAt": "2026-08-16T18:53:23.876Z"
     },
     {
       "id": "3",
+      "username": "Kush01",
+      "passwordHash": "$2a$10$fJI3wJCZQwZzLYsgAUxceOeTbgS5tp4m3yPPaKkURO9jr/YHDbao.",
+      "fullName": "Shubham",
+      "mobileNumber": "+916386522362",
+      "role": "SUPERVISOR",
+      "createdAt": "2026-08-16T18:53:23.949Z"
+    },
+    {
+      "id": "4",
       "username": "Shubh01",
-      "passwordHash": "$2a$10$mwobEjBDSWCL0QOu9FZKMuLyaJFtWgNFoMqO4l3ts3xCeB1V8s66m",
+      "passwordHash": "$2a$10$OOKZFCcJTvA2/U3qpt3G3OgJ3D/fCIoOHqSizkz/KJmpH3Qx03JFW",
       "fullName": "Shubham Pratap Singh",
       "mobileNumber": "+91 8573029430",
       "role": "SUPERVISOR",
-      "createdAt": "2026-08-16T18:38:01.978Z"
+      "createdAt": "2026-08-16T18:53:24.025Z"
     }
   ],
   "relayRequests": [],

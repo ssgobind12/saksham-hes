@@ -93,7 +93,7 @@ const DEFAULT_USERS = [
   {
     id: '1',
     username: 'admin',
-    passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'ssgobind12', 10),
+    passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'admin123', 10),
     fullName: 'System Administrator (Shubham)',
     mobileNumber: '+91 8573029430',
     role: 'ADMIN',
@@ -101,6 +101,15 @@ const DEFAULT_USERS = [
   },
   {
     id: '2',
+    username: 'super01',
+    passwordHash: bcrypt.hashSync('super123', 10),
+    fullName: 'Field Supervisor',
+    mobileNumber: '+91 8573029430',
+    role: 'SUPERVISOR',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: '3',
     username: 'Kush01',
     passwordHash: bcrypt.hashSync('Shubham@001', 10),
     fullName: 'Shubham',
@@ -109,7 +118,7 @@ const DEFAULT_USERS = [
     createdAt: new Date().toISOString()
   },
   {
-    id: '3',
+    id: '4',
     username: 'Shubh01',
     passwordHash: bcrypt.hashSync('Shubh@123', 10),
     fullName: 'Shubham Pratap Singh',
