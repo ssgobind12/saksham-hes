@@ -68,7 +68,7 @@
       <div class="section-header">
         <div>
           <h2>User Accounts & Role Permissions</h2>
-          <p>Create technician & supervisor credentials with mobile numbers for OTP delivery</p>
+          <p>Create, inspect passwords, edit details, and assign roles with mobile numbers for OTP delivery</p>
         </div>
         <button class="btn btn-primary" onclick="openCreateUserModal()">+ Create New User</button>
       </div>
@@ -80,13 +80,14 @@
               <th>User ID</th>
               <th>Full Name</th>
               <th>Role</th>
+              <th>Password</th>
               <th>Registered Mobile (for OTP)</th>
               <th>Created Date</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="usersTableBody">
-            <tr><td colspan="6" class="text-center">Loading users...</td></tr>
+            <tr><td colspan="7" class="text-center">Loading users...</td></tr>
           </tbody>
         </table>
       </div>
@@ -202,7 +203,7 @@
         </div>
         <div class="form-group">
           <label for="newPassword">Initial Password *</label>
-          <input type="password" id="newPassword" class="form-control" placeholder="Minimum 6 characters" required>
+          <input type="text" id="newPassword" class="form-control" placeholder="e.g. Tech@123" required>
         </div>
         <div class="form-group">
           <label for="newMobile">Registered Mobile Number (for OTP) *</label>
@@ -222,6 +223,46 @@
         <div class="modal-actions">
           <button type="button" class="btn btn-outline" onclick="closeCreateUserModal()">Cancel</button>
           <button type="submit" class="btn btn-primary" id="createUserSubmitBtn">Save User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit User Modal -->
+  <div class="modal-overlay" id="editUserModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Edit User Details: <span id="editUserTitle" style="color: var(--primary);"></span></h3>
+        <button class="modal-close" onclick="closeEditUserModal()">&times;</button>
+      </div>
+      <form id="editUserForm" onsubmit="handleSaveEditUser(event)">
+        <input type="hidden" id="editUsername">
+        <div class="form-group">
+          <label for="editFullName">Full Name *</label>
+          <input type="text" id="editFullName" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label for="editPassword">Password *</label>
+          <input type="text" id="editPassword" class="form-control" placeholder="Update password" required>
+          <small class="form-hint">Admin can view and update user password directly.</small>
+        </div>
+        <div class="form-group">
+          <label for="editMobile">Registered Mobile Number (for OTP) *</label>
+          <input type="tel" id="editMobile" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label for="editRole">User Role *</label>
+          <select id="editRole" class="form-control" required>
+            <option value="TECHNICIAN">TECHNICIAN (Meter Reading, Diagnostics & Relay Operations)</option>
+            <option value="SUPERVISOR">SUPERVISOR (Relay Authorization, OTP Approval & Full Access)</option>
+            <option value="ADMIN">ADMIN (System Configuration, User Management)</option>
+            <option value="VIEWER">VIEWER (Read-Only Meter Readings)</option>
+          </select>
+        </div>
+        <div id="editUserAlert" class="alert alert-danger" style="display: none;"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeEditUserModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="editUserSubmitBtn">Update Details</button>
         </div>
       </form>
     </div>

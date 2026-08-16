@@ -37,10 +37,9 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (e.g. mobile APKs, curl, Postman)
     if (!origin) return callback(null, true);
     const normalizedOrigin = origin.replace(/\/$/, '');
-    if (allowedOrigins.includes(normalizedOrigin) || normalizedOrigin.endsWith('ssgobind.space') || normalizedOrigin.includes('localhost')) {
+    if (allowedOrigins.includes(normalizedOrigin) || normalizedOrigin.endsWith('ssgobind.space') || normalizedOrigin.includes('localhost') || normalizedOrigin.includes('onrender.com')) {
       return callback(null, true);
     }
     return callback(null, true);
@@ -63,6 +62,7 @@ function loadData() {
           id: '1',
           username: ADMIN_USERNAME,
           passwordHash: hashPassword(ADMIN_PASSWORD),
+          plainPassword: ADMIN_PASSWORD,
           fullName: 'System Administrator',
           mobileNumber: '+91 9800000000',
           role: 'ADMIN',
@@ -72,6 +72,7 @@ function loadData() {
           id: '2',
           username: 'tech01',
           passwordHash: hashPassword('tech123'),
+          plainPassword: 'tech123',
           fullName: 'Shubh Technician',
           mobileNumber: '+91 9876543210',
           role: 'TECHNICIAN',
@@ -81,6 +82,7 @@ function loadData() {
           id: '3',
           username: 'super01',
           passwordHash: hashPassword('super123'),
+          plainPassword: 'super123',
           fullName: 'Field Supervisor',
           mobileNumber: '+91 9123456780',
           role: 'SUPERVISOR',
@@ -107,15 +109,19 @@ function loadData() {
       id: '1',
       username: ADMIN_USERNAME,
       passwordHash: hashPassword(ADMIN_PASSWORD),
+      plainPassword: ADMIN_PASSWORD,
       fullName: 'System Administrator',
       mobileNumber: '+91 9800000000',
       role: 'ADMIN',
       createdAt: new Date().toISOString()
     });
     saveData(data);
-  } else if (process.env.ADMIN_PASSWORD && data.users[adminIndex].passwordHash !== hashPassword(ADMIN_PASSWORD)) {
-    data.users[adminIndex].passwordHash = hashPassword(ADMIN_PASSWORD);
-    saveData(data);
+  } else {
+    if (process.env.ADMIN_PASSWORD && data.users[adminIndex].passwordHash !== hashPassword(ADMIN_PASSWORD)) {
+      data.users[adminIndex].passwordHash = hashPassword(ADMIN_PASSWORD);
+      data.users[adminIndex].plainPassword = ADMIN_PASSWORD;
+      saveData(data);
+    }
   }
 
   return data;
@@ -189,12 +195,13 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Users: Get List
+// Users: Get List (Includes plain password for admin inspection)
 app.get('/api/users', (req, res) => {
   const db = loadData();
   const safeUsers = db.users.map(u => ({
     id: u.id,
     username: u.username,
+    password: u.plainPassword || '••••••••',
     fullName: u.fullName,
     mobileNumber: u.mobileNumber,
     role: u.role,
@@ -225,7 +232,8 @@ app.post('/api/users', (req, res) => {
   const newUser = {
     id: Date.now().toString(),
     username: username.trim(),
-    passwordHash: hashPassword(password),
+    passwordHash: hashPassword(password.trim()),
+    plainPassword: password.trim(),
     fullName: fullName.trim(),
     mobileNumber: mobileNumber.trim(),
     role: userRole,
@@ -241,10 +249,56 @@ app.post('/api/users', (req, res) => {
     user: {
       id: newUser.id,
       username: newUser.username,
+      password: newUser.plainPassword,
       fullName: newUser.fullName,
       mobileNumber: newUser.mobileNumber,
       role: newUser.role,
       createdAt: newUser.createdAt
+    }
+  });
+});
+
+// Users: Edit / Update User Details & Password
+app.put('/api/users/:username', (req, res) => {
+  const { username } = req.params;
+  const { fullName, mobileNumber, role, password } = req.body;
+
+  const db = loadData();
+  const index = db.users.findIndex(u => u.username.toLowerCase() === username.trim().toLowerCase());
+
+  if (index === -1) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  const user = db.users[index];
+
+  if (fullName && fullName.trim()) user.fullName = fullName.trim();
+  if (mobileNumber && mobileNumber.trim()) user.mobileNumber = mobileNumber.trim();
+  if (role) {
+    const validRoles = ['VIEWER', 'TECHNICIAN', 'SUPERVISOR', 'ADMIN'];
+    const userRole = role.toUpperCase();
+    if (validRoles.includes(userRole)) {
+      user.role = userRole;
+    }
+  }
+  if (password && password.trim()) {
+    user.plainPassword = password.trim();
+    user.passwordHash = hashPassword(password.trim());
+  }
+
+  saveData(db);
+
+  res.json({
+    success: true,
+    message: `User '${username}' updated successfully`,
+    user: {
+      id: user.id,
+      username: user.username,
+      password: user.plainPassword,
+      fullName: user.fullName,
+      mobileNumber: user.mobileNumber,
+      role: user.role,
+      createdAt: user.createdAt
     }
   });
 });

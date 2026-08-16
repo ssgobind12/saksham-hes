@@ -1,5 +1,6 @@
 let currentUser = null;
 let authToken = localStorage.getItem('hes_token');
+let cachedUsers = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   if (authToken) {
@@ -114,7 +115,7 @@ function switchTab(tabId) {
 }
 
 // -------------------------------------------------------------
-// User Management
+// User Management (View Passwords & Edit Details)
 // -------------------------------------------------------------
 
 async function loadUsers() {
@@ -124,26 +125,49 @@ async function loadUsers() {
     const data = await res.json();
     
     if (!data.success || !data.users.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center">No registered users found</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center">No registered users found</td></tr>';
       return;
     }
 
-    tbody.innerHTML = data.users.map(u => `
+    cachedUsers = data.users;
+
+    tbody.innerHTML = data.users.map((u, idx) => `
       <tr>
         <td><strong>${escapeHtml(u.username)}</strong></td>
         <td>${escapeHtml(u.fullName)}</td>
         <td><span class="chip ${getRoleChipClass(u.role)}">${u.role}</span></td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <code id="passField_${idx}" style="font-weight: 600; background: #f1f5f9; padding: 3px 8px; border-radius: 4px;">${escapeHtml(u.password)}</code>
+            <button class="btn btn-outline btn-sm" style="padding: 2px 6px; font-size: 0.75rem;" onclick="togglePasswordVisibility('${idx}', '${escapeHtml(u.password)}')">👁️</button>
+          </div>
+        </td>
         <td><code>${escapeHtml(u.mobileNumber)}</code></td>
         <td>${formatDate(u.createdAt)}</td>
         <td>
-          ${u.username !== 'admin' ? `
-            <button class="btn btn-outline-danger btn-sm" onclick="deleteUser('${u.username}')">Delete</button>
-          ` : '<span class="chip chip-info">Primary Admin</span>'}
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-outline btn-sm" onclick="openEditUserModal('${escapeHtml(u.username)}')">✏️ Edit</button>
+            ${u.username !== 'admin' ? `
+              <button class="btn btn-outline-danger btn-sm" onclick="deleteUser('${escapeHtml(u.username)}')">🗑️ Delete</button>
+            ` : '<span class="chip chip-info" style="align-self: center;">Primary Admin</span>'}
+          </div>
         </td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Failed to load users: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Failed to load users: ${err.message}</td></tr>`;
+  }
+}
+
+function togglePasswordVisibility(idx, actualPassword) {
+  const el = document.getElementById(`passField_${idx}`);
+  if (!el) return;
+  if (el.textContent === '••••••••') {
+    el.textContent = actualPassword;
+  } else if (el.textContent === actualPassword) {
+    el.textContent = '••••••••';
+  } else {
+    el.textContent = actualPassword;
   }
 }
 
@@ -187,13 +211,71 @@ async function handleCreateUser(event) {
 
     closeCreateUserModal();
     loadUsers();
-    alert(`User '${username}' created successfully!\nRole: ${role}\nRegistered Mobile: ${mobileNumber}`);
   } catch (err) {
     alertBox.textContent = 'Server error: ' + err.message;
     alertBox.style.display = 'block';
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Save User';
+  }
+}
+
+// Edit User Modal
+function openEditUserModal(username) {
+  const user = cachedUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (!user) return;
+
+  document.getElementById('editUserTitle').textContent = user.username;
+  document.getElementById('editUsername').value = user.username;
+  document.getElementById('editFullName').value = user.fullName || '';
+  document.getElementById('editPassword').value = user.password || '';
+  document.getElementById('editMobile').value = user.mobileNumber || '';
+  document.getElementById('editRole').value = user.role || 'TECHNICIAN';
+  document.getElementById('editUserAlert').style.display = 'none';
+
+  document.getElementById('editUserModal').style.display = 'flex';
+}
+
+function closeEditUserModal() {
+  document.getElementById('editUserModal').style.display = 'none';
+}
+
+async function handleSaveEditUser(event) {
+  event.preventDefault();
+  const username = document.getElementById('editUsername').value.trim();
+  const fullName = document.getElementById('editFullName').value.trim();
+  const password = document.getElementById('editPassword').value.trim();
+  const mobileNumber = document.getElementById('editMobile').value.trim();
+  const role = document.getElementById('editRole').value;
+  const alertBox = document.getElementById('editUserAlert');
+  const submitBtn = document.getElementById('editUserSubmitBtn');
+
+  alertBox.style.display = 'none';
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Updating...';
+
+  try {
+    const res = await fetch(`/api/users/${encodeURIComponent(username)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName, password, mobileNumber, role })
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      alertBox.textContent = data.message || 'Failed to update user';
+      alertBox.style.display = 'block';
+      return;
+    }
+
+    closeEditUserModal();
+    loadUsers();
+  } catch (err) {
+    alertBox.textContent = 'Server error: ' + err.message;
+    alertBox.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Update Details';
   }
 }
 
