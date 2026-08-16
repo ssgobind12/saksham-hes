@@ -156,9 +156,40 @@ app.get('/api/health', (req, res) => {
     status: 'ONLINE',
     server: 'ssgobind.space HES Portal',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: '1.2.0',
     env: process.env.NODE_ENV || 'production'
   });
+});
+
+// App Version & In-App Updates
+app.get('/api/app/version', (req, res) => {
+  res.json({
+    success: true,
+    versionCode: 102,
+    versionName: '1.2.0',
+    minSupportedVersion: 100,
+    apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
+    releaseNotes: '• Real DLMS Genus BLE Meter Data Decoding\n• Profile Screen with In-App Auto-Updater\n• Strict Role-Based User Security',
+    mandatory: false,
+    updatedAt: new Date().toISOString()
+  });
+});
+
+// Download Latest Android APK
+app.get('/api/app/download', (req, res) => {
+  const apkPath = path.join(__dirname, 'public', 'SAKSHAM-145-MeterClient.apk');
+  const localApkPath = path.join(__dirname, 'SAKSHAM-145-MeterClient.apk');
+  const rootApkPath = path.join(__dirname, '..', 'SAKSHAM-145-MeterClient.apk');
+  
+  if (fs.existsSync(apkPath)) {
+    return res.download(apkPath, 'SAKSHAM-145-MeterClient.apk');
+  } else if (fs.existsSync(localApkPath)) {
+    return res.download(localApkPath, 'SAKSHAM-145-MeterClient.apk');
+  } else if (fs.existsSync(rootApkPath)) {
+    return res.download(rootApkPath, 'SAKSHAM-145-MeterClient.apk');
+  } else {
+    return res.redirect('https://github.com/ssgobind12/saksham-hes');
+  }
 });
 
 // Auth: Login
