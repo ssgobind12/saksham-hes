@@ -112,6 +112,10 @@ function switchTab(tabId) {
   if (tabId === 'otpTab') loadRelayRequests();
   if (tabId === 'readingsTab') loadReadings();
   if (tabId === 'relayLogsTab') loadRelayLogs();
+  if (tabId === 'gatewayTab') {
+    initGatewaySocket();
+    loadGatewayMeters();
+  }
 }
 
 // -------------------------------------------------------------
@@ -411,3 +415,183 @@ function getRoleChipClass(role) {
     default: return 'chip-success';
   }
 }
+
+// -------------------------------------------------------------
+// Live Gateway
+// -------------------------------------------------------------
+
+let portalSocket = null;
+let connectedMetersList = [];
+
+function initGatewaySocket() {
+  if (portalSocket) return;
+  portalSocket = io('/portal');
+  
+  portalSocket.on('connect', () => {
+    updateGatewayStatus('Connected', true);
+    addGatewayLog('Portal connected to gateway server');
+  });
+  
+  portalSocket.on('disconnect', () => {
+    updateGatewayStatus('Disconnected', false);
+    addGatewayLog('Portal disconnected from gateway server');
+  });
+  
+  portalSocket.on('meters:list', (meters) => {
+    connectedMetersList = meters;
+    renderConnectedMeters();
+    updateMeterSelector();
+  });
+  
+  portalSocket.on('meter:online', (data) => {
+    addGatewayLog(`✅ Meter ${data.meterId} connected via ${data.appUser || 'app'}`);
+    loadGatewayMeters();
+  });
+  
+  portalSocket.on('meter:offline', (data) => {
+    addGatewayLog(`❌ Meter ${data.meterId} disconnected`);
+    loadGatewayMeters();
+  });
+  
+  portalSocket.on('meter:data', (data) => {
+    addGatewayLog(`📊 Live data from meter ${data.meterId}: ${data.voltage}V, ${data.current}A`);
+    updateMeterRow(data);
+  });
+  
+  portalSocket.on('command:response', (data) => {
+    const responseEl = document.getElementById('commandResponse');
+    responseEl.textContent = JSON.stringify(data, null, 2);
+    responseEl.style.display = 'block';
+    addGatewayLog(`📨 Command response: ${data.success ? 'SUCCESS' : 'FAILED'}`);
+  });
+}
+
+async function loadGatewayMeters() {
+  try {
+    const res = await fetch('/api/gateway/meters');
+    const data = await res.json();
+    if (data.success) {
+      connectedMetersList = data.meters;
+      renderConnectedMeters();
+      updateMeterSelector();
+      document.getElementById('meterCountBadge').textContent = connectedMetersList.length;
+    }
+  } catch (err) {
+    console.error('Failed to load gateway meters:', err);
+  }
+}
+
+function renderConnectedMeters() {
+  const tbody = document.getElementById('connectedMetersTableBody');
+  if (!connectedMetersList || connectedMetersList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center">No meters connected to gateway</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = connectedMetersList.map(m => `
+    <tr id="gateway-meter-${escapeHtml(m.meterId)}">
+      <td><strong>${escapeHtml(m.meterId)}</strong></td>
+      <td>${escapeHtml(m.deviceName || 'N/A')}</td>
+      <td>${escapeHtml(m.appUser || 'N/A')}</td>
+      <td class="td-voltage">${m.voltage || 'N/A'}</td>
+      <td class="td-current">${m.current || 'N/A'}</td>
+      <td class="td-power">${m.activePower || 'N/A'}</td>
+      <td class="td-pf">${m.powerFactor || 'N/A'}</td>
+      <td class="td-energy">${m.importEnergy || 'N/A'}</td>
+      <td class="td-relay">${m.relayStatus || 'N/A'}</td>
+      <td class="td-lastupdate">${m.lastUpdate ? formatDate(m.lastUpdate) : 'N/A'}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="setCmdMeter('${escapeHtml(m.meterId)}')">Select</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function updateMeterRow(data) {
+  const row = document.getElementById(`gateway-meter-${data.meterId}`);
+  if (!row) return;
+  if (data.voltage !== undefined) row.querySelector('.td-voltage').textContent = data.voltage;
+  if (data.current !== undefined) row.querySelector('.td-current').textContent = data.current;
+  if (data.activePower !== undefined) row.querySelector('.td-power').textContent = data.activePower;
+  if (data.powerFactor !== undefined) row.querySelector('.td-pf').textContent = data.powerFactor;
+  if (data.importEnergy !== undefined) row.querySelector('.td-energy').textContent = data.importEnergy;
+  if (data.relayStatus !== undefined) row.querySelector('.td-relay').textContent = data.relayStatus;
+  row.querySelector('.td-lastupdate').textContent = formatDate(new Date());
+}
+
+function updateMeterSelector() {
+  const select = document.getElementById('cmdMeterSelect');
+  if (!select) return;
+  const currentVal = select.value;
+  
+  select.innerHTML = '<option value="">-- Select Meter --</option>' + 
+    connectedMetersList.map(m => `<option value="${escapeHtml(m.meterId)}">${escapeHtml(m.meterId)}</option>`).join('');
+    
+  if (currentVal && connectedMetersList.find(m => m.meterId === currentVal)) {
+    select.value = currentVal;
+  }
+}
+
+function setCmdMeter(meterId) {
+  const select = document.getElementById('cmdMeterSelect');
+  if (select && select.querySelector(`option[value="${meterId}"]`)) {
+    select.value = meterId;
+  }
+}
+
+function updateGatewayStatus(text, isOnline) {
+  const dot = document.getElementById('gatewayStatusDot');
+  const textEl = document.getElementById('gatewayStatusText');
+  if (dot) {
+    dot.className = `status-dot ${isOnline ? 'online' : 'offline'}`;
+  }
+  if (textEl) {
+    textEl.textContent = text;
+  }
+}
+
+function addGatewayLog(message) {
+  const logDiv = document.getElementById('gatewayActivityLog');
+  if (!logDiv) return;
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'log-time';
+  
+  const now = new Date();
+  timeSpan.textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+  
+  entry.appendChild(timeSpan);
+  entry.appendChild(document.createTextNode(' ' + message));
+  
+  logDiv.prepend(entry);
+  
+  // keep max 100 entries
+  while (logDiv.children.length > 100) {
+    logDiv.removeChild(logDiv.lastChild);
+  }
+}
+
+function sendGatewayCommand() {
+  const meterId = document.getElementById('cmdMeterSelect').value;
+  const command = document.getElementById('cmdSelect').value;
+  
+  if (!meterId) {
+    alert('Please select a meter first');
+    return;
+  }
+  
+  if (!portalSocket || !portalSocket.connected) {
+    alert('Not connected to gateway server');
+    return;
+  }
+  
+  const responseEl = document.getElementById('commandResponse');
+  responseEl.textContent = 'Executing...';
+  responseEl.style.display = 'block';
+  
+  addGatewayLog(`📤 Sending command ${command} to ${meterId}...`);
+  portalSocket.emit('command:send', { meterId, command });
+}
+

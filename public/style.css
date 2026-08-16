@@ -385,3 +385,26 @@ body {
   gap: 10px;
   margin-top: 20px;
 }
+
+/* Gateway Status */
+.gateway-status { display: flex; align-items: center; gap: 8px; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; }
+.status-dot.online { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.status-dot.offline { background: #ef4444; }
+
+/* Command Panel */
+.command-panel { background: var(--surface, #f8fafc); border-radius: 12px; padding: 20px; margin-top: 16px; border: 1px solid var(--border, #e2e8f0); }
+.command-panel h3 { margin: 0 0 12px; font-size: 1rem; }
+.command-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.command-row .form-group { flex: 1; min-width: 200px; }
+.command-response { margin-top: 12px; background: #1e293b; color: #e2e8f0; border-radius: 8px; padding: 16px; font-family: 'Courier New', monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto; white-space: pre-wrap; display: none; }
+
+/* Activity Log */
+.activity-log { max-height: 300px; overflow-y: auto; background: var(--surface, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 12px; margin-top: 16px; }
+.log-entry { padding: 4px 0; font-size: 0.85rem; border-bottom: 1px solid var(--border, #e2e8f0); color: var(--text-secondary, #64748b); }
+.log-entry:last-child { border-bottom: none; }
+.log-time { color: var(--primary, #3b82f6); font-weight: 600; margin-right: 8px; font-size: 0.75rem; }
+
+/* Connected meters count badge */
+.meter-count-badge { background: var(--primary, #3b82f6); color: white; border-radius: 12px; padding: 2px 10px; font-size: 0.8rem; font-weight: 600; }
+

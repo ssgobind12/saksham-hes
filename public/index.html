@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
@@ -61,6 +62,7 @@
       <button class="nav-tab" onclick="switchTab('otpTab')">🔑 Relay Approvals & OTP</button>
       <button class="nav-tab" onclick="switchTab('readingsTab')">📊 Meter Readings</button>
       <button class="nav-tab" onclick="switchTab('relayLogsTab')">📜 Relay Audit Logs</button>
+      <button class="nav-tab" onclick="switchTab('gatewayTab')">⚡ Live Gateway</button>
     </nav>
 
     <!-- TAB 1: User Management -->
@@ -181,6 +183,72 @@
             <tr><td colspan="7" class="text-center">No relay audit logs available</td></tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- TAB 5: Live Gateway -->
+    <section class="tab-content" id="gatewayTab">
+      <div class="section-header">
+        <div>
+          <h2>Live Gateway Monitoring</h2>
+          <p>Real-time gateway connection and command execution</p>
+        </div>
+        <div class="gateway-status">
+          <div class="status-dot offline" id="gatewayStatusDot"></div>
+          <span id="gatewayStatusText">Disconnected</span>
+          <span class="meter-count-badge" id="meterCountBadge">0</span>
+        </div>
+      </div>
+
+      <div class="table-container card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Meter Serial</th>
+              <th>Device Name</th>
+              <th>App User</th>
+              <th>Voltage (V)</th>
+              <th>Current (A)</th>
+              <th>Active Power (kW)</th>
+              <th>Power Factor</th>
+              <th>Import kWh</th>
+              <th>Relay Status</th>
+              <th>Last Update</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="connectedMetersTableBody">
+            <tr><td colspan="11" class="text-center">No meters connected to gateway</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="command-panel">
+        <h3>Command Execution Panel</h3>
+        <div class="command-row">
+          <div class="form-group">
+            <label for="cmdMeterSelect">Select Meter</label>
+            <select id="cmdMeterSelect" class="form-control">
+              <option value="">-- Select Meter --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="cmdSelect">Select Command</label>
+            <select id="cmdSelect" class="form-control">
+              <option value="read_instantaneous">Read Instantaneous</option>
+              <option value="disconnect_relay">Disconnect Relay</option>
+              <option value="reconnect_relay">Reconnect Relay</option>
+              <option value="read_meter_info">Read Meter Info</option>
+              <option value="read_relay_status">Read Relay Status</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="sendGatewayCommand()" style="margin-bottom: 16px;">Execute Command</button>
+        </div>
+        <div id="commandResponse" class="command-response"></div>
+      </div>
+
+      <div class="activity-log" id="gatewayActivityLog">
+        <div class="log-entry"><span class="log-time">System</span> Gateway log initialized.</div>
       </div>
     </section>
   </main>

@@ -21,6 +21,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const http = require('http');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -157,11 +158,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 202,
-    versionName: '1.2.2',
+    versionCode: 300,
+    versionName: '1.3.0',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Removed manual administrative / role selection\n• In-app direct progress updater\n• Real DLMS Genus BLE Meter Data Decoding\n• Live Energy & Tariff Registers Dynamic Binding',
+    releaseNotes: '• Removed manual administrative / role selection\n• In-app direct progress updater\n• Real DLMS Genus BLE Meter Data Decoding\n• Live Energy & Tariff Registers Dynamic Binding\n• Added gateway feature',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
@@ -490,7 +491,240 @@ app.get('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = http.createServer(app);
+let io = null;
+
+try {
+  const { Server } = require('socket.io');
+  io = new Server(server, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    }
+  });
+} catch (e) {
+  console.warn('[SOCKET.IO] Warning: socket.io module not yet loaded');
+}
+
+// In-memory tracking of live gateway connections
+const connectedMeters = new Map(); // socketId -> { meterId, appUser, connectedAt, lastData, socketId, isRawWs, wsHandle }
+
+// Unified command dispatcher (works with both Socket.IO and Raw WebSocket)
+function forwardCommandToGateway(meterId, command, commandId) {
+  for (const [id, meter] of connectedMeters.entries()) {
+    if (meter.meterId === meterId) {
+      if (meter.isRawWs && meter.wsHandle && meter.wsHandle.readyState === 1) {
+        meter.wsHandle.send(JSON.stringify({
+          event: 'command:execute',
+          data: { command, commandId }
+        }));
+        return true;
+      } else if (io) {
+        io.of('/gateway').to(id).emit('command:execute', { command, commandId });
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Raw WebSocket Server for Android Gateway Client (/gateway-ws)
+let WebSocket;
+try {
+  WebSocket = require('ws');
+} catch (e) {
+  try {
+    WebSocket = require('socket.io/node_modules/engine.io/node_modules/ws');
+  } catch (e2) {
+    WebSocket = null;
+  }
+}
+
+if (WebSocket) {
+  const rawWss = new WebSocket.Server({ server, path: '/gateway-ws' });
+
+  rawWss.on('connection', (ws) => {
+    const wsId = 'ws_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+    console.log(`[GATEWAY-WS] Connected: ${wsId}`);
+
+    ws.on('message', (message) => {
+      try {
+        const payload = JSON.parse(message.toString());
+        const { event, data } = payload;
+
+        if (event === 'meter:connected') {
+          connectedMeters.set(wsId, {
+            meterId: data.meterId,
+            deviceName: data.deviceName,
+            appUser: data.appUser,
+            connectedAt: new Date().toISOString(),
+            lastData: null,
+            socketId: wsId,
+            isRawWs: true,
+            wsHandle: ws
+          });
+          if (io) io.of('/portal').emit('meter:online', { meterId: data.meterId, deviceName: data.deviceName, appUser: data.appUser });
+          console.log(`[GATEWAY-WS] Meter connected: ${data.meterId}`);
+        } else if (event === 'meter:data') {
+          const meter = connectedMeters.get(wsId);
+          if (meter) {
+            meter.lastData = data;
+          }
+          const db = loadData();
+          const newEntry = {
+            id: Date.now().toString(),
+            receivedAt: new Date().toISOString(),
+            ...data
+          };
+          db.meterReadings.unshift(newEntry);
+          if (db.meterReadings.length > 500) db.meterReadings = db.meterReadings.slice(0, 500);
+          saveData(db);
+
+          if (io) io.of('/portal').emit('meter:data', data);
+        } else if (event === 'meter:disconnected') {
+          const meter = connectedMeters.get(wsId);
+          if (meter) {
+            if (io) io.of('/portal').emit('meter:offline', { meterId: meter.meterId });
+            connectedMeters.delete(wsId);
+          }
+        } else if (event === 'command:response') {
+          if (io) io.of('/portal').emit('command:response', data);
+        }
+      } catch (err) {
+        console.error('[GATEWAY-WS] Parse error:', err.message);
+      }
+    });
+
+    ws.on('close', () => {
+      const meter = connectedMeters.get(wsId);
+      if (meter) {
+        if (io) io.of('/portal').emit('meter:offline', { meterId: meter.meterId });
+        connectedMeters.delete(wsId);
+      }
+      console.log(`[GATEWAY-WS] Disconnected: ${wsId}`);
+    });
+  });
+}
+
+// Gateway namespace (Socket.IO)
+if (io) {
+  io.of('/gateway').on('connection', (socket) => {
+    console.log(`[GATEWAY] Connected: ${socket.id}`);
+
+    socket.on('meter:connected', (data) => {
+      connectedMeters.set(socket.id, {
+        meterId: data.meterId,
+        deviceName: data.deviceName,
+        appUser: data.appUser,
+        connectedAt: new Date().toISOString(),
+        lastData: null,
+        socketId: socket.id,
+        isRawWs: false
+      });
+      io.of('/portal').emit('meter:online', { meterId: data.meterId, deviceName: data.deviceName, appUser: data.appUser });
+    });
+
+    socket.on('meter:data', (data) => {
+      const meter = connectedMeters.get(socket.id);
+      if (meter) {
+        meter.lastData = data;
+      }
+      const db = loadData();
+      const newEntry = {
+        id: Date.now().toString(),
+        receivedAt: new Date().toISOString(),
+        ...data
+      };
+      db.meterReadings.unshift(newEntry);
+      if (db.meterReadings.length > 500) db.meterReadings = db.meterReadings.slice(0, 500);
+      saveData(db);
+
+      io.of('/portal').emit('meter:data', data);
+    });
+
+    socket.on('meter:disconnected', () => {
+      const meter = connectedMeters.get(socket.id);
+      if (meter) {
+        io.of('/portal').emit('meter:offline', { meterId: meter.meterId });
+        connectedMeters.delete(socket.id);
+      }
+    });
+
+    socket.on('command:response', (data) => {
+      io.of('/portal').emit('command:response', data);
+    });
+
+    socket.on('disconnect', () => {
+      const meter = connectedMeters.get(socket.id);
+      if (meter) {
+        io.of('/portal').emit('meter:offline', { meterId: meter.meterId });
+        connectedMeters.delete(socket.id);
+      }
+      console.log(`[GATEWAY] Disconnected: ${socket.id}`);
+    });
+  });
+
+  // Portal namespace (Socket.IO)
+  io.of('/portal').on('connection', (socket) => {
+    console.log(`[PORTAL] Connected: ${socket.id}`);
+    const safeMeters = Array.from(connectedMeters.values()).map(m => ({
+      meterId: m.meterId,
+      deviceName: m.deviceName,
+      appUser: m.appUser,
+      connectedAt: m.connectedAt,
+      lastData: m.lastData,
+      voltage: m.lastData?.voltage,
+      current: m.lastData?.current,
+      activePower: m.lastData?.activePower,
+      powerFactor: m.lastData?.powerFactor,
+      importEnergy: m.lastData?.importActiveEnergy,
+      relayStatus: m.lastData?.relayState,
+      lastUpdate: m.lastData?.timestamp
+    }));
+    socket.emit('meters:list', safeMeters);
+
+    socket.on('command:send', (data) => {
+      const { meterId, command, commandId } = data;
+      const cid = commandId || 'cmd_' + Date.now();
+      const sent = forwardCommandToGateway(meterId, command, cid);
+      if (!sent) {
+        socket.emit('command:response', {
+          commandId: cid,
+          success: false,
+          error: `Meter ${meterId} is not connected or gateway is offline`
+        });
+      }
+    });
+  });
+}
+
+// Gateway API routes
+app.get('/api/gateway/meters', (req, res) => {
+  const safeMeters = Array.from(connectedMeters.values()).map(m => ({
+    meterId: m.meterId,
+    deviceName: m.deviceName,
+    appUser: m.appUser,
+    connectedAt: m.connectedAt,
+    lastData: m.lastData,
+    voltage: m.lastData?.voltage,
+    current: m.lastData?.current,
+    activePower: m.lastData?.activePower,
+    powerFactor: m.lastData?.powerFactor,
+    importEnergy: m.lastData?.importActiveEnergy,
+    relayStatus: m.lastData?.relayState,
+    lastUpdate: m.lastData?.timestamp
+  }));
+  res.json({ success: true, meters: safeMeters });
+});
+
+app.post('/api/gateway/command', (req, res) => {
+  const { meterId, command, commandId } = req.body;
+  const cid = commandId || 'cmd_' + Date.now();
+  const sent = forwardCommandToGateway(meterId, command, cid);
+  res.json({ success: sent, message: sent ? 'Command dispatched' : 'Meter not found or offline' });
+});
+
+server.listen(PORT, () => {
   console.log(`===================================================`);
   console.log(` SAKSHAM-145 HES Portal & API Server`);
   console.log(` Running on: http://localhost:${PORT}`);
