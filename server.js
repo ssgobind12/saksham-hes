@@ -157,11 +157,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 201,
-    versionName: '1.2.1',
+    versionCode: 202,
+    versionName: '1.2.2',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Real DLMS Genus BLE Meter Data Decoding\n• Live Energy & Tariff Registers Dynamic Binding\n• Profile Screen with Instant In-App Auto-Updater\n• Strict Role-Based User Security',
+    releaseNotes: '• Removed manual administrative / role selection\n• In-app direct progress updater\n• Real DLMS Genus BLE Meter Data Decoding\n• Live Energy & Tariff Registers Dynamic Binding',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
