@@ -118,14 +118,36 @@ function switchTab(tabId) {
   }
 }
 
+// Centralized authenticated fetch helper
+async function authFetch(url, options = {}) {
+  const headers = options.headers || {};
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  const config = {
+    ...options,
+    headers
+  };
+  const res = await fetch(url, config);
+  if (res.status === 401 || res.status === 403) {
+    localStorage.removeItem('hes_token');
+    localStorage.removeItem('hes_user');
+    authToken = null;
+    currentUser = null;
+    showLogin();
+    throw new Error('Session expired or unauthorized. Please sign in again.');
+  }
+  return res;
+}
+
 // -------------------------------------------------------------
-// User Management (View Passwords & Edit Details)
+// User Management (Secure Role Management & Edit Details)
 // -------------------------------------------------------------
 
 async function loadUsers() {
   const tbody = document.getElementById('usersTableBody');
   try {
-    const res = await fetch('/api/users');
+    const res = await authFetch('/api/users');
     const data = await res.json();
     
     if (!data.success || !data.users.length) {
@@ -135,16 +157,13 @@ async function loadUsers() {
 
     cachedUsers = data.users;
 
-    tbody.innerHTML = data.users.map((u, idx) => `
+    tbody.innerHTML = data.users.map((u) => `
       <tr>
         <td><strong>${escapeHtml(u.username)}</strong></td>
         <td>${escapeHtml(u.fullName)}</td>
         <td><span class="chip ${getRoleChipClass(u.role)}">${u.role}</span></td>
         <td>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <code id="passField_${idx}" style="font-weight: 600; background: #f1f5f9; padding: 3px 8px; border-radius: 4px;">${escapeHtml(u.password)}</code>
-            <button class="btn btn-outline btn-sm" style="padding: 2px 6px; font-size: 0.75rem;" onclick="togglePasswordVisibility('${idx}', '${escapeHtml(u.password)}')">👁️</button>
-          </div>
+          <span class="chip chip-success" style="font-size: 0.78rem;">🔒 Bcrypt Hash Encrypted</span>
         </td>
         <td><code>${escapeHtml(u.mobileNumber)}</code></td>
         <td>${formatDate(u.createdAt)}</td>
@@ -160,18 +179,6 @@ async function loadUsers() {
     `).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Failed to load users: ${err.message}</td></tr>`;
-  }
-}
-
-function togglePasswordVisibility(idx, actualPassword) {
-  const el = document.getElementById(`passField_${idx}`);
-  if (!el) return;
-  if (el.textContent === '••••••••') {
-    el.textContent = actualPassword;
-  } else if (el.textContent === actualPassword) {
-    el.textContent = '••••••••';
-  } else {
-    el.textContent = actualPassword;
   }
 }
 
@@ -200,7 +207,7 @@ async function handleCreateUser(event) {
   submitBtn.textContent = 'Saving...';
 
   try {
-    const res = await fetch('/api/users', {
+    const res = await authFetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, fullName, password, mobileNumber, role })
@@ -232,7 +239,8 @@ function openEditUserModal(username) {
   document.getElementById('editUserTitle').textContent = user.username;
   document.getElementById('editUsername').value = user.username;
   document.getElementById('editFullName').value = user.fullName || '';
-  document.getElementById('editPassword').value = user.password || '';
+  document.getElementById('editPassword').value = '';
+  document.getElementById('editPassword').placeholder = 'Leave blank to keep current password';
   document.getElementById('editMobile').value = user.mobileNumber || '';
   document.getElementById('editRole').value = user.role || 'TECHNICIAN';
   document.getElementById('editUserAlert').style.display = 'none';
@@ -259,10 +267,13 @@ async function handleSaveEditUser(event) {
   submitBtn.textContent = 'Updating...';
 
   try {
-    const res = await fetch(`/api/users/${encodeURIComponent(username)}`, {
+    const payload = { fullName, mobileNumber, role };
+    if (password) payload.password = password;
+
+    const res = await authFetch(`/api/users/${encodeURIComponent(username)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName, password, mobileNumber, role })
+      body: JSON.stringify(payload)
     });
 
     const data = await res.json();
@@ -286,7 +297,7 @@ async function handleSaveEditUser(event) {
 async function deleteUser(username) {
   if (confirm(`Are you sure you want to delete user account '${username}'?`)) {
     try {
-      const res = await fetch(`/api/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         loadUsers();
@@ -306,7 +317,7 @@ async function deleteUser(username) {
 async function loadRelayRequests() {
   const tbody = document.getElementById('otpTableBody');
   try {
-    const res = await fetch('/api/relay/requests');
+    const res = await authFetch('/api/relay/requests');
     const data = await res.json();
 
     if (!data.success || !data.requests.length) {
@@ -338,7 +349,7 @@ async function loadRelayRequests() {
 async function loadReadings() {
   const tbody = document.getElementById('readingsTableBody');
   try {
-    const res = await fetch('/api/meters/readings');
+    const res = await authFetch('/api/meters/readings');
     const data = await res.json();
 
     if (!data.success || !data.readings.length) {
@@ -369,7 +380,7 @@ async function loadReadings() {
 async function loadRelayLogs() {
   const tbody = document.getElementById('relayLogsTableBody');
   try {
-    const res = await fetch('/api/meters/relay/logs');
+    const res = await authFetch('/api/meters/relay/logs');
     const data = await res.json();
 
     if (!data.success || !data.logs.length) {
@@ -468,7 +479,7 @@ function initGatewaySocket() {
 
 async function loadGatewayMeters() {
   try {
-    const res = await fetch('/api/gateway/meters');
+    const res = await authFetch('/api/gateway/meters');
     const data = await res.json();
     if (data.success) {
       connectedMetersList = data.meters;

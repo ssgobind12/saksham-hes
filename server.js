@@ -22,16 +22,25 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const http = require('http');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
-const JWT_SECRET = process.env.JWT_SECRET || 'saksham145-secret-key-ssgobind-2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'saksham145-jwt-production-secret-ssgobind-2026';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-// CORS configuration supporting web portal, mobile apps, and custom origins
-const defaultOrigins = ['https://ssgobind.space', 'https://www.ssgobind.space', 'http://localhost:3000', 'http://localhost:5173'];
+// CORS configuration - strict origin validation (no credentials wildcard)
+const defaultOrigins = [
+  'https://ssgobind.space',
+  'https://www.ssgobind.space',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173'
+];
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim().replace(/\/$/, ''))
   : defaultOrigins;
@@ -40,10 +49,17 @@ app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     const normalizedOrigin = origin.replace(/\/$/, '');
-    if (allowedOrigins.includes(normalizedOrigin) || normalizedOrigin.endsWith('ssgobind.space') || normalizedOrigin.includes('localhost') || normalizedOrigin.includes('onrender.com')) {
+    if (
+      allowedOrigins.includes(normalizedOrigin) ||
+      normalizedOrigin.endsWith('.ssgobind.space') ||
+      normalizedOrigin === 'https://ssgobind.space' ||
+      normalizedOrigin.includes('localhost') ||
+      normalizedOrigin.includes('127.0.0.1') ||
+      normalizedOrigin.endsWith('.onrender.com')
+    ) {
       return callback(null, true);
     }
-    return callback(null, true);
+    return callback(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -53,13 +69,31 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Password helpers (salted bcrypt hashing)
+function hashPassword(password) {
+  return bcrypt.hashSync(password, 10);
+}
+
+function verifyPassword(password, storedHash) {
+  if (!storedHash || !password) return false;
+  if (storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$')) {
+    try {
+      return bcrypt.compareSync(password, storedHash);
+    } catch (e) {
+      return false;
+    }
+  }
+  // Migration fallback: if legacy sha256 hash was stored
+  const legacyHash = crypto.createHash('sha256').update(password).digest('hex');
+  return storedHash === legacyHash;
+}
+
 // Default baseline users (guaranteed to always exist across server restarts and deploys)
 const DEFAULT_USERS = [
   {
     id: '1',
     username: 'admin',
-    passwordHash: hashPassword(process.env.ADMIN_PASSWORD || 'ssgobind12'),
-    plainPassword: process.env.ADMIN_PASSWORD || 'ssgobind12',
+    passwordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'ssgobind12', 10),
     fullName: 'System Administrator (Shubham)',
     mobileNumber: '+91 8573029430',
     role: 'ADMIN',
@@ -68,8 +102,7 @@ const DEFAULT_USERS = [
   {
     id: '2',
     username: 'Kush01',
-    passwordHash: hashPassword('Shubham@001'),
-    plainPassword: 'Shubham@001',
+    passwordHash: bcrypt.hashSync('Shubham@001', 10),
     fullName: 'Shubham',
     mobileNumber: '+916386522362',
     role: 'SUPERVISOR',
@@ -78,8 +111,7 @@ const DEFAULT_USERS = [
   {
     id: '3',
     username: 'Shubh01',
-    passwordHash: hashPassword('Shubh@123'),
-    plainPassword: 'Shubh@123',
+    passwordHash: bcrypt.hashSync('Shubh@123', 10),
     fullName: 'Shubham Pratap Singh',
     mobileNumber: '+91 8573029430',
     role: 'SUPERVISOR',
@@ -109,13 +141,26 @@ function loadData() {
     data = { users: [...DEFAULT_USERS], relayRequests: [], relayLogs: [], meterReadings: [] };
   }
 
-  // Ensure default baseline users always exist without wiping custom created users
+  // Sanitize: remove any legacy plainPassword and ensure bcrypt hashes
+  let needsSave = false;
+  data.users.forEach(u => {
+    if (u.plainPassword !== undefined) {
+      delete u.plainPassword;
+      needsSave = true;
+    }
+  });
+
   DEFAULT_USERS.forEach(defUser => {
     const existingIndex = data.users.findIndex(u => u.username.toLowerCase() === defUser.username.toLowerCase());
     if (existingIndex === -1) {
       data.users.push(defUser);
+      needsSave = true;
     }
   });
+
+  if (needsSave) {
+    saveData(data);
+  }
 
   return data;
 }
@@ -124,19 +169,41 @@ function saveData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-function hashPassword(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
+// Signed JSON Web Token creation
+function generateToken(user) {
+  return jwt.sign(
+    {
+      userId: user.id,
+      username: user.username,
+      role: user.role,
+      mobile: user.mobileNumber
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
 }
 
-function generateToken(user) {
-  const payload = {
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-    mobile: user.mobileNumber,
-    exp: Date.now() + 24 * 60 * 60 * 1000
-  };
-  return Buffer.from(JSON.stringify(payload)).toString('base64');
+// JWT Authentication Middleware for Protected Routes
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  let token = null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7).trim();
+  } else if (req.query && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Authentication required. No token provided.' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ success: false, message: 'Invalid or expired authorization token.' });
+    }
+    req.user = decoded;
+    next();
+  });
 }
 
 // -------------------------------------------------------------
@@ -158,11 +225,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 301,
-    versionName: '1.3.1',
+    versionCode: 302,
+    versionName: '1.3.2',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Removed OTP display from client app (Admin Authorization required)\n• Integrated 2.03M Authorized SAKSHAM Meter Registry\n• Strict BLE Device Filtering (non-meters & unauthorized devices hidden)\n• DLMS Real-Time Gateway & Command Tunneling',
+    releaseNotes: '• Security Hardening: Real signed JWT auth & salted bcrypt password hashing\n• Removed backdoor accounts & universal OTP bypass codes (10-min expiry enforced)\n• HDLC I-Frame dynamic sequence tracking (sendSeq/recvSeq mod 8) & frame length fix\n• Real Profile Generic DLMS event querying & removed fabricated fallback values',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
@@ -194,14 +261,14 @@ app.post('/api/auth/login', (req, res) => {
   const db = loadData();
   const user = db.users.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
 
-  const isPasswordMatch = user && (
-    user.passwordHash === hashPassword(password) ||
-    user.plainPassword === password ||
-    (user.username.toLowerCase() === 'admin' && (password === 'admin' || password === 'admin123' || password === 'ssgobind12'))
-  );
-
-  if (!user || !isPasswordMatch) {
+  if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ success: false, message: 'Invalid username or password' });
+  }
+
+  // If user had legacy hash, upgrade to bcrypt on successful login
+  if (!user.passwordHash.startsWith('$2a$') && !user.passwordHash.startsWith('$2b$')) {
+    user.passwordHash = hashPassword(password);
+    saveData(db);
   }
 
   const token = generateToken(user);
@@ -224,13 +291,12 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Users: Get List (Includes plain password for admin inspection)
-app.get('/api/users', (req, res) => {
+// Users: Get List (Sanitized: NO passwords returned)
+app.get('/api/users', authenticateToken, (req, res) => {
   const db = loadData();
   const safeUsers = db.users.map(u => ({
     id: u.id,
     username: u.username,
-    password: u.plainPassword || '••••••••',
     fullName: u.fullName,
     mobileNumber: u.mobileNumber,
     role: u.role,
@@ -239,8 +305,8 @@ app.get('/api/users', (req, res) => {
   res.json({ success: true, users: safeUsers });
 });
 
-// Users: Create User
-app.post('/api/users', (req, res) => {
+// Users: Create User (Bcrypt hashed password)
+app.post('/api/users', authenticateToken, (req, res) => {
   const { username, password, fullName, mobileNumber, role } = req.body;
 
   if (!username || !password || !fullName || !mobileNumber) {
@@ -262,7 +328,6 @@ app.post('/api/users', (req, res) => {
     id: Date.now().toString(),
     username: username.trim(),
     passwordHash: hashPassword(password.trim()),
-    plainPassword: password.trim(),
     fullName: fullName.trim(),
     mobileNumber: mobileNumber.trim(),
     role: userRole,
@@ -278,7 +343,6 @@ app.post('/api/users', (req, res) => {
     user: {
       id: newUser.id,
       username: newUser.username,
-      password: newUser.plainPassword,
       fullName: newUser.fullName,
       mobileNumber: newUser.mobileNumber,
       role: newUser.role,
@@ -287,8 +351,8 @@ app.post('/api/users', (req, res) => {
   });
 });
 
-// Users: Edit / Update User Details & Password
-app.put('/api/users/:username', (req, res) => {
+// Users: Edit / Update User Details & Password (Bcrypt hashed)
+app.put('/api/users/:username', authenticateToken, (req, res) => {
   const { username } = req.params;
   const { fullName, mobileNumber, role, password } = req.body;
 
@@ -311,7 +375,6 @@ app.put('/api/users/:username', (req, res) => {
     }
   }
   if (password && password.trim()) {
-    user.plainPassword = password.trim();
     user.passwordHash = hashPassword(password.trim());
   }
 
@@ -323,7 +386,6 @@ app.put('/api/users/:username', (req, res) => {
     user: {
       id: user.id,
       username: user.username,
-      password: user.plainPassword,
       fullName: user.fullName,
       mobileNumber: user.mobileNumber,
       role: user.role,
@@ -333,7 +395,7 @@ app.put('/api/users/:username', (req, res) => {
 });
 
 // Users: Delete User
-app.delete('/api/users/:username', (req, res) => {
+app.delete('/api/users/:username', authenticateToken, (req, res) => {
   const { username } = req.params;
   const db = loadData();
   const index = db.users.findIndex(u => u.username.toLowerCase() === username.trim().toLowerCase());
@@ -352,17 +414,17 @@ app.delete('/api/users/:username', (req, res) => {
 });
 
 // Relay: Request OTP
-app.post('/api/relay/otp/request', (req, res) => {
+app.post('/api/relay/otp/request', authenticateToken, (req, res) => {
   const { meterId, action, username } = req.body;
   if (!meterId || !action) {
     return res.status(400).json({ success: false, message: 'meterId and action are required' });
   }
 
   const db = loadData();
-  const user = db.users.find(u => u.username.toLowerCase() === (username || '').trim().toLowerCase()) || {
-    username: username || 'technician',
-    fullName: 'Field Technician',
-    mobileNumber: '+91 Registered Mobile'
+  const user = db.users.find(u => u.username.toLowerCase() === (username || req.user.username || '').trim().toLowerCase()) || {
+    username: req.user.username || 'technician',
+    fullName: req.user.username || 'Field Technician',
+    mobileNumber: req.user.mobile || '+91 Registered Mobile'
   };
 
   // Generate 6-digit OTP
@@ -396,10 +458,10 @@ app.post('/api/relay/otp/request', (req, res) => {
   });
 });
 
-// Relay: Verify OTP
-app.post('/api/relay/otp/verify', (req, res) => {
+// Relay: Verify OTP (Strict: 10-minute expiry window check, exact OTP match, NO hardcoded bypasses)
+app.post('/api/relay/otp/verify', authenticateToken, (req, res) => {
   const { requestId, otp, meterId } = req.body;
-  if (!otp) {
+  if (!otp || !otp.trim()) {
     return res.status(400).json({ success: false, message: 'OTP is required' });
   }
 
@@ -408,17 +470,27 @@ app.post('/api/relay/otp/verify', (req, res) => {
     (requestId && r.requestId === requestId) || (meterId && r.meterId === meterId && r.status === 'OTP_SENT')
   );
 
-  const isValid = (reqItem && reqItem.otp === otp.trim()) || otp.trim() === '123456' || otp.trim() === '849201';
-
-  if (!isValid) {
-    return res.status(400).json({ success: false, message: 'Invalid or expired OTP code' });
+  if (!reqItem) {
+    return res.status(404).json({ success: false, message: 'No active OTP request found for this meter' });
   }
 
-  if (reqItem) {
-    reqItem.status = 'APPROVED';
-    reqItem.approvedAt = new Date().toISOString();
+  // 10-Minute Expiry Check
+  const isExpired = !reqItem.expiresAt || (new Date(reqItem.expiresAt).getTime() <= Date.now());
+  if (isExpired) {
+    reqItem.status = 'EXPIRED';
     saveData(db);
+    return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP code.' });
   }
+
+  // Strict OTP equality check (NO bypass codes)
+  if (reqItem.otp !== otp.trim()) {
+    return res.status(400).json({ success: false, message: 'Invalid OTP code. Please obtain authorization code from Administrator.' });
+  }
+
+  reqItem.status = 'APPROVED';
+  reqItem.approvedAt = new Date().toISOString();
+  reqItem.approvedBy = req.user ? req.user.username : 'admin';
+  saveData(db);
 
   res.json({
     success: true,
@@ -428,13 +500,13 @@ app.post('/api/relay/otp/verify', (req, res) => {
 });
 
 // Relay: Get Pending Requests
-app.get('/api/relay/requests', (req, res) => {
+app.get('/api/relay/requests', authenticateToken, (req, res) => {
   const db = loadData();
   res.json({ success: true, requests: db.relayRequests });
 });
 
 // Meter Readings: Upload
-app.post('/api/meters/readings', (req, res) => {
+app.post('/api/meters/readings', authenticateToken, (req, res) => {
   const reading = req.body;
   const db = loadData();
   const newEntry = {
@@ -449,13 +521,13 @@ app.post('/api/meters/readings', (req, res) => {
 });
 
 // Meter Readings: Get List
-app.get('/api/meters/readings', (req, res) => {
+app.get('/api/meters/readings', authenticateToken, (req, res) => {
   const db = loadData();
   res.json({ success: true, readings: db.meterReadings });
 });
 
 // Relay Logs: Upload
-app.post('/api/meters/relay/log', (req, res) => {
+app.post('/api/meters/relay/log', authenticateToken, (req, res) => {
   const log = req.body;
   const db = loadData();
   const newEntry = {
@@ -470,7 +542,7 @@ app.post('/api/meters/relay/log', (req, res) => {
 });
 
 // Relay Logs: Get List
-app.get('/api/meters/relay/logs', (req, res) => {
+app.get('/api/meters/relay/logs', authenticateToken, (req, res) => {
   const db = loadData();
   res.json({ success: true, logs: db.relayLogs });
 });
@@ -698,7 +770,7 @@ if (io) {
 }
 
 // Gateway API routes
-app.get('/api/gateway/meters', (req, res) => {
+app.get('/api/gateway/meters', authenticateToken, (req, res) => {
   const safeMeters = Array.from(connectedMeters.values()).map(m => ({
     meterId: m.meterId,
     deviceName: m.deviceName,
@@ -716,7 +788,7 @@ app.get('/api/gateway/meters', (req, res) => {
   res.json({ success: true, meters: safeMeters });
 });
 
-app.post('/api/gateway/command', (req, res) => {
+app.post('/api/gateway/command', authenticateToken, (req, res) => {
   const { meterId, command, commandId } = req.body;
   const cid = commandId || 'cmd_' + Date.now();
   const sent = forwardCommandToGateway(meterId, command, cid);
