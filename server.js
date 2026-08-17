@@ -254,11 +254,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 309,
-    versionName: '1.3.9',
+    versionCode: 310,
+    versionName: '1.4.0',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Synchronized GATT Write Queue: Mutex-locked BLE chunk transmission prevents packet collisions and GATT_BUSY drops\n• Persistent Physical Metrics: Retains real live Voltage, Current, kW, and Import kWh readings without flickering to zeros\n• Accurate Relay Action Feedback: Direct disconnector execution on physical switch',
+    releaseNotes: '• Resilient Multi-Strategy Relay Execution: Supports standard Disconnector 0.0.96.3.10.255, parameter-omitted invocation, and alternative Disconnector OBIS 0.0.96.3.0.255\n• Automatic Class 3 / Class 4 Register Fallback: Guarantees energy & instantaneous parameter decoding across all Genus firmware versions\n• Instant Hardware Tripping Confirmation',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
