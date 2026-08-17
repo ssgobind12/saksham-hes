@@ -254,11 +254,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 307,
-    versionName: '1.3.7',
+    versionCode: 308,
+    versionName: '1.3.8',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Fixed Gateway Command Execution: Resolved unknown command error for disconnect_relay and reconnect_relay\n• Removed Mock Fallback: Completely eliminated 14550 kWh mock simulator from physical hardware session\n• Flexible AARE Validation: Enhanced DLMS association handshake parser for Genus single-phase meters',
+    releaseNotes: '• Robust DLMS Framing & Reassembly: Fixed packet fragmentation for 23-byte MTU and full HDLC Type 3 length decoding\n• Direct Physical Register Reading: Decodes Voltage, Current, kW, and Import kWh directly from meter\n• Guaranteed Relay Execution: Immediate hardware switch execution for disconnect and reconnect',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
