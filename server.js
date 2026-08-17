@@ -254,11 +254,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 308,
-    versionName: '1.3.8',
+    versionCode: 309,
+    versionName: '1.3.9',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Robust DLMS Framing & Reassembly: Fixed packet fragmentation for 23-byte MTU and full HDLC Type 3 length decoding\n• Direct Physical Register Reading: Decodes Voltage, Current, kW, and Import kWh directly from meter\n• Guaranteed Relay Execution: Immediate hardware switch execution for disconnect and reconnect',
+    releaseNotes: '• Synchronized GATT Write Queue: Mutex-locked BLE chunk transmission prevents packet collisions and GATT_BUSY drops\n• Persistent Physical Metrics: Retains real live Voltage, Current, kW, and Import kWh readings without flickering to zeros\n• Accurate Relay Action Feedback: Direct disconnector execution on physical switch',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
