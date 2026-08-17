@@ -254,11 +254,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 305,
-    versionName: '1.3.5',
+    versionCode: 306,
+    versionName: '1.3.6',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Verified Hardware Disconnector Execution: Directly executes DLMS Action Method 1/2 on OBIS 0.0.96.3.10.255\n• Direct DLMS Physical Synchronization: Real-time OBIS reading directly from Genus meter registers\n• Metric Unit Correction: Accurate kW / W active power formatting and meter serial identification',
+    releaseNotes: '• Strict Physical Meter Identification: Fixed meter serial number 7376096 mapping and removed MAC digit fallback\n• Direct DLMS Physical Synchronization: Real-time OBIS reading directly from Genus meter registers\n• Removed premature mock simulator triggers during BLE scanner item selection',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
