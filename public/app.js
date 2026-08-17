@@ -357,17 +357,32 @@ async function loadReadings() {
       return;
     }
 
-    tbody.innerHTML = data.readings.map(rd => `
-      <tr>
-        <td><strong>${escapeHtml(rd.meterSerial || rd.serialNumber || 'N/A')}</strong></td>
-        <td>${rd.voltage ? Number(rd.voltage).toFixed(1) + ' V' : 'N/A'}</td>
-        <td>${rd.current ? Number(rd.current).toFixed(2) + ' A' : 'N/A'}</td>
-        <td>${rd.activePower ? Number(rd.activePower).toFixed(2) + ' kW' : 'N/A'}</td>
-        <td>${rd.powerFactor ? Number(rd.powerFactor).toFixed(2) : 'N/A'}</td>
-        <td>${rd.importActiveEnergy ? Number(rd.importActiveEnergy).toFixed(2) + ' kWh' : 'N/A'}</td>
-        <td>${formatDate(rd.receivedAt || rd.timestamp)}</td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = data.readings.map(rd => {
+      const serial = rd.meterSerial || rd.meterId || rd.serialNumber || 'SAKSHAM-145';
+      const voltStr = (rd.voltage !== undefined && rd.voltage !== null) ? Number(rd.voltage).toFixed(1) + ' V' : 'N/A';
+      const currStr = (rd.current !== undefined && rd.current !== null) ? Number(rd.current).toFixed(2) + ' A' : 'N/A';
+      
+      let pwrStr = 'N/A';
+      if (rd.activePower !== undefined && rd.activePower !== null) {
+        const rawPwr = Number(rd.activePower);
+        pwrStr = rawPwr > 50 ? (rawPwr / 1000).toFixed(3) + ' kW' : rawPwr.toFixed(3) + ' kW';
+      }
+
+      const pfStr = (rd.powerFactor !== undefined && rd.powerFactor !== null) ? Number(rd.powerFactor).toFixed(2) : 'N/A';
+      const kwhStr = (rd.importActiveEnergy !== undefined && rd.importActiveEnergy !== null) ? Number(rd.importActiveEnergy).toFixed(2) + ' kWh' : 'N/A';
+
+      return `
+        <tr>
+          <td><strong>${escapeHtml(serial)}</strong></td>
+          <td>${voltStr}</td>
+          <td>${currStr}</td>
+          <td>${pwrStr}</td>
+          <td>${pfStr}</td>
+          <td>${kwhStr}</td>
+          <td>${formatDate(rd.receivedAt || rd.timestamp)}</td>
+        </tr>
+      `;
+    }).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Failed to load readings: ${err.message}</td></tr>`;
   }

@@ -254,11 +254,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 303,
-    versionName: '1.3.3',
+    versionCode: 304,
+    versionName: '1.3.4',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Real-Time BLE & DLMS Live Polling: Fixed 0.0 reading display across Dashboard & Energy screens\n• Seamless Relay OTP Dispatch: Added optional auth so field requests generate & dispatch instantly\n• Enhanced Dynamic Refresh: Instant one-tap synchronization for all instantaneous measurements',
+    releaseNotes: '• Direct DLMS Physical Synchronization: Real-time OBIS reading directly from Genus meter registers\n• Asynchronous GATT Ready Synchronization: Eliminated race condition & simulator fallback\n• Metric Unit Correction: Accurate kW / W active power formatting and meter serial identification',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
@@ -671,17 +671,20 @@ if (WebSocket) {
           if (meter) {
             meter.lastData = data;
           }
+          const serial = data.meterSerial || data.meterId || data.serialNumber || (meter ? meter.meterId : 'SAKSHAM-145');
           const db = loadData();
           const newEntry = {
             id: Date.now().toString(),
             receivedAt: new Date().toISOString(),
+            meterSerial: serial,
+            meterId: serial,
             ...data
           };
           db.meterReadings.unshift(newEntry);
           if (db.meterReadings.length > 500) db.meterReadings = db.meterReadings.slice(0, 500);
           saveData(db);
 
-          if (io) io.of('/portal').emit('meter:data', data);
+          if (io) io.of('/portal').emit('meter:data', newEntry);
         } else if (event === 'meter:disconnected') {
           const meter = connectedMeters.get(wsId);
           if (meter) {
@@ -730,17 +733,20 @@ if (io) {
       if (meter) {
         meter.lastData = data;
       }
+      const serial = data.meterSerial || data.meterId || data.serialNumber || (meter ? meter.meterId : 'SAKSHAM-145');
       const db = loadData();
       const newEntry = {
         id: Date.now().toString(),
         receivedAt: new Date().toISOString(),
+        meterSerial: serial,
+        meterId: serial,
         ...data
       };
       db.meterReadings.unshift(newEntry);
       if (db.meterReadings.length > 500) db.meterReadings = db.meterReadings.slice(0, 500);
       saveData(db);
 
-      io.of('/portal').emit('meter:data', data);
+      io.of('/portal').emit('meter:data', newEntry);
     });
 
     socket.on('meter:disconnected', () => {
