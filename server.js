@@ -254,11 +254,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   res.json({
     success: true,
-    versionCode: 306,
-    versionName: '1.3.6',
+    versionCode: 307,
+    versionName: '1.3.7',
     minSupportedVersion: 100,
     apkUrl: 'https://saksham-hes.onrender.com/api/app/download',
-    releaseNotes: '• Strict Physical Meter Identification: Fixed meter serial number 7376096 mapping and removed MAC digit fallback\n• Direct DLMS Physical Synchronization: Real-time OBIS reading directly from Genus meter registers\n• Removed premature mock simulator triggers during BLE scanner item selection',
+    releaseNotes: '• Fixed Gateway Command Execution: Resolved unknown command error for disconnect_relay and reconnect_relay\n• Removed Mock Fallback: Completely eliminated 14550 kWh mock simulator from physical hardware session\n• Flexible AARE Validation: Enhanced DLMS association handshake parser for Genus single-phase meters',
     mandatory: false,
     updatedAt: new Date().toISOString()
   });
